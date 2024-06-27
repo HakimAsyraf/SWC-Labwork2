@@ -1,0 +1,418 @@
+import javax.swing.*; // Essential imports for GUI components
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableCellEditor;
+import java.awt.*; // Imports for layout managers and events
+import java.awt.event.*;
+import java.util.ArrayList;
+
+public class SupplierManagement extends JFrame 
+{
+    private ArrayList<Order> orderListArray; // Stores orders in a list
+    private JTable orderTable; // Table to show orders
+    private DefaultTableModel tableModel; // Model for the table
+    private JTextField nameInput, phoneInput, addressInput; // Input fields
+    private JButton addBtn, deleteBtn, backBtn; // Buttons
+    private JPanel inputFieldsPanel, buttonsPanel, mainPanel; // Panels to organize layout
+    private JComboBox<String> orderTypeComboBox; // Dropdown for order types
+    private JRadioButton urgentRadioButton, normalRadioButton; // Priority options
+    private ButtonGroup priorityGroup; // Grouping radio buttons
+    private int editingRow = -1; // For tracking which row is being edited
+
+    // Constructor to set up the GUI
+    public SupplierManagement() 
+    {
+        orderListArray = new ArrayList<>();
+
+        // Setting up the frame
+        setTitle("Supplier Management");
+        setSize(800, 500);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null); // Center the window on the screen
+
+        // Defining columns for the table
+        String[] columns = {"Edit", "Name", "Phone Number", "Address", "Order Type", "Priority"};
+
+        // Initializing table model and table
+        tableModel = new DefaultTableModel(columns, 0);
+        orderTable = new JTable(tableModel) 
+        {
+            @Override
+            public boolean isCellEditable(int row, int column) 
+            {
+                return column == 0; // Only the 'Edit' column is editable
+            }
+        };
+
+        // Adjusting the 'Edit' column width
+        orderTable.getColumnModel().getColumn(0).setPreferredWidth(50);
+
+        // Adding 'Edit' buttons to the table
+        orderTable.getColumnModel().getColumn(0).setCellRenderer(new ButtonRenderer());
+        orderTable.getColumnModel().getColumn(0).setCellEditor(new ButtonEditor(new JCheckBox()));
+
+        // Adding the table to a scroll pane
+        JScrollPane scrollPane = new JScrollPane(orderTable);
+
+        // Setting up input fields panel
+        inputFieldsPanel = new JPanel(new GridLayout(5, 2));
+        nameInput = new JTextField();
+        phoneInput = new JTextField();
+        addressInput = new JTextField();
+
+        // Order types dropdown with placeholder
+        String[] orderTypes = {"Choose Your Type", "Tshirt", "Pants", "Bag", "Shoes", "Cap", "Hoodie", "Sweatshirt", "Random"};
+        orderTypeComboBox = new JComboBox<>(orderTypes);
+        orderTypeComboBox.setSelectedIndex(0);
+        orderTypeComboBox.setForeground(Color.GRAY);
+        orderTypeComboBox.addActionListener(new ActionListener() 
+        {
+            @Override
+            public void actionPerformed(ActionEvent e) 
+            {
+                if (orderTypeComboBox.getSelectedIndex() == 0) 
+                {
+                    orderTypeComboBox.setForeground(Color.GRAY);
+                } else {
+                    orderTypeComboBox.setForeground(Color.BLACK);
+                }
+            }
+        });
+
+        // Setting up priority radio buttons
+        urgentRadioButton = new JRadioButton("Urgent");
+        normalRadioButton = new JRadioButton("Normal");
+        priorityGroup = new ButtonGroup();
+        priorityGroup.add(urgentRadioButton);
+        priorityGroup.add(normalRadioButton);
+
+        // Adding placeholder text to input fields
+        setPlaceholderText(nameInput, "Put Your Name");
+        setPlaceholderText(phoneInput, "###-### ####");
+        setPlaceholderText(addressInput, "Building Number, Building Name, District, State, Zip Code");
+
+        // Limiting phone number input to 10 characters
+        phoneInput.getDocument().addDocumentListener(new DocumentListener() 
+        {
+            @Override
+            public void insertUpdate(DocumentEvent e) 
+            {
+                if (phoneInput.getText().length() > 10) 
+                {
+                    phoneInput.setText(phoneInput.getText().substring(0, 10));
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {}
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {}
+        });
+
+        // Adding input fields and labels to the panel
+        inputFieldsPanel.add(new JLabel("Name:"));
+        inputFieldsPanel.add(nameInput);
+        inputFieldsPanel.add(new JLabel("Phone Number:"));
+        inputFieldsPanel.add(phoneInput);
+        inputFieldsPanel.add(new JLabel("Address:"));
+        inputFieldsPanel.add(addressInput);
+        inputFieldsPanel.add(new JLabel("Order Type:"));
+        inputFieldsPanel.add(orderTypeComboBox);
+        inputFieldsPanel.add(new JLabel("Priority:"));
+        JPanel priorityPanel = new JPanel(new FlowLayout());
+        priorityPanel.add(urgentRadioButton);
+        priorityPanel.add(normalRadioButton);
+        inputFieldsPanel.add(priorityPanel);
+
+        // Setting up buttons panel
+        buttonsPanel = new JPanel(new GridLayout(1, 3));
+        addBtn = new JButton("Add Order");
+        addBtn.setBackground(Color.GREEN);
+        addBtn.addActionListener(new ActionListener() 
+        {
+            public void actionPerformed(ActionEvent e) 
+            {
+                if (editingRow == -1) 
+                {
+                    addNewOrder();
+                } else {
+                    updateOrder();
+                }
+            }
+        });
+        buttonsPanel.add(addBtn);
+
+        deleteBtn = new JButton("Delete Order");
+        deleteBtn.setBackground(Color.RED);
+        deleteBtn.addActionListener(new ActionListener() 
+        {
+            public void actionPerformed(ActionEvent e) 
+            {
+                deleteSelectedOrder();
+            }
+        });
+        buttonsPanel.add(deleteBtn);
+
+        backBtn = new JButton("Back");
+        backBtn.setBackground(Color.CYAN);
+        backBtn.addActionListener(new ActionListener() 
+        {
+            public void actionPerformed(ActionEvent e) 
+            {
+                handleBackAction();
+            }
+        });
+        buttonsPanel.add(backBtn);
+
+        // Adding panels to the main panel
+        mainPanel = new JPanel(new BorderLayout());
+        mainPanel.add(inputFieldsPanel, BorderLayout.NORTH);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(buttonsPanel, BorderLayout.SOUTH);
+
+        // Adding main panel to the frame
+        add(mainPanel);
+
+        // Making the window visible
+        setVisible(true);
+    }
+
+    // Method to set placeholder text
+    private void setPlaceholderText(JTextField textField, String placeholder) 
+    {
+        textField.setText(placeholder);
+        textField.setForeground(Color.GRAY);
+        textField.addFocusListener(new FocusAdapter() 
+        {
+            @Override
+            public void focusGained(FocusEvent e) 
+            {
+                if (textField.getText().equals(placeholder)) 
+                {
+                    textField.setText("");
+                    textField.setForeground(Color.BLACK);
+                }
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) 
+            {
+                if (textField.getText().isEmpty()) 
+                {
+                    textField.setForeground(Color.GRAY);
+                    textField.setText(placeholder);
+                }
+            }
+        });
+    }
+
+    // Method to add a new order
+    private void addNewOrder() 
+    {
+        String name = nameInput.getText();
+        String phone = phoneInput.getText();
+        String address = addressInput.getText();
+        String orderType = (String) orderTypeComboBox.getSelectedItem();
+        String priority = urgentRadioButton.isSelected() ? "Urgent" : "Normal";
+
+        if (!name.isEmpty() && !phone.isEmpty() && !address.isEmpty()
+                && !name.equals("Put Your Name") && !phone.equals("###-### ####")
+                && !address.equals("Building Number, Building Name, District, State, Zip Code")
+                && !orderType.equals("Choose Your Type")) {
+            Order newOrder = new Order(name, phone, address, orderType, priority);
+            orderListArray.add(newOrder);
+            tableModel.addRow(new Object[]{"Edit", name, phone, address, orderType, priority});
+            clearInputFields();
+        } else {
+            JOptionPane.showMessageDialog(this, "Please Choose Your Order", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Method to update an existing order
+    private void updateOrder() 
+    {
+        String name = nameInput.getText();
+        String phone = phoneInput.getText();
+        String address = addressInput.getText();
+        String orderType = (String) orderTypeComboBox.getSelectedItem();
+        String priority = urgentRadioButton.isSelected() ? "Urgent" : "Normal";
+
+        if (!name.isEmpty() && !phone.isEmpty() && !address.isEmpty()
+                && !name.equals("Put Your Name") && !phone.equals("###-### ####")
+                && !address.equals("Building Number, Building Name, District, State, Zip Code")
+                && !orderType.equals("Choose Your Type")) 
+                {
+            Order updatedOrder = new Order(name, phone, address, orderType, priority);
+            orderListArray.set(editingRow, updatedOrder);
+            tableModel.setValueAt(name, editingRow, 1);
+            tableModel.setValueAt(phone, editingRow, 2);
+            tableModel.setValueAt(address, editingRow, 3);
+            tableModel.setValueAt(orderType, editingRow, 4);
+            tableModel.setValueAt(priority, editingRow, 5);
+            clearInputFields();
+            editingRow = -1; // Reset editing row
+        } else {
+            JOptionPane.showMessageDialog(this, "Please Choose Your Order", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Method to delete the selected order
+    private void deleteSelectedOrder() 
+    {
+        int selectedIndex = orderTable.getSelectedRow();
+        if (selectedIndex != -1) 
+        {
+            orderListArray.remove(selectedIndex);
+            tableModel.removeRow(selectedIndex);
+        } else {
+            JOptionPane.showMessageDialog(this, "No order selected.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Handler for the Back button
+    private void handleBackAction() 
+    {
+        JOptionPane.showMessageDialog(this, "Back button clicked.");
+    }
+
+    // Method to clear input fields and reset placeholders
+    private void clearInputFields() 
+    {
+        resetPlaceholderText(nameInput, "Put Your Name");
+        resetPlaceholderText(phoneInput, "###-### ####");
+        resetPlaceholderText(addressInput, "Building Number, Building Name, District, State, Zip Code");
+        orderTypeComboBox.setSelectedIndex(0); // Reset to first item
+        priorityGroup.clearSelection(); // Clear radio button selection
+    }
+
+    // Method to reset placeholder text
+    private void resetPlaceholderText(JTextField textField, String placeholder) 
+    {
+        textField.setText(placeholder);
+        textField.setForeground(Color.GRAY);
+    }
+
+    // Main method to run the application
+    public static void main(String[] args) 
+    {
+        SupplierManagement sm = new SupplierManagement();
+        sm.setVisible(true);
+    }
+
+    // Class to represent an order
+    class Order 
+    {
+        private String name;
+        private String phone;
+        private String address;
+        private String orderType;
+        private String priority;
+
+        public Order(String name, String phone, String address, String orderType, String priority) 
+        {
+            this.name = name;
+            this.phone = phone;
+            this.address = address;
+            this.orderType = orderType;
+            this.priority = priority;
+        }
+
+        @Override
+        public String toString() 
+        {
+            return "Name: " + name + ", Phone: " + phone + ", Address: " + address +
+                   ", Order Type: " + orderType + ", Priority: " + priority;
+        }
+    }
+
+    // ButtonRenderer class to render the 'Edit' button in the table
+    class ButtonRenderer extends JButton implements TableCellRenderer 
+    {
+        public ButtonRenderer() 
+        {
+            setOpaque(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,boolean isSelected, boolean hasFocus, int row, int column) 
+        {
+            setText((value == null) ? "Edit" : value.toString());
+            return this;
+        }
+    }
+
+    // ButtonEditor class to handle the 'Edit' button click events
+    class ButtonEditor extends DefaultCellEditor 
+    {
+        private String label;
+        private boolean isPushed;
+
+        public ButtonEditor(JCheckBox checkBox) 
+        {
+            super(checkBox);
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value,
+                                                     boolean isSelected, int row, int column) 
+        {
+            label = (value == null) ? "Edit" : value.toString();
+            JButton button = new JButton(label);
+            button.setOpaque(true);
+            button.addActionListener(new ActionListener() 
+            {
+                public void actionPerformed(ActionEvent e) 
+                {
+                    fireEditingStopped();
+                    editOrder(row);
+                }
+            });
+            return button;
+        }
+
+        @Override
+        public Object getCellEditorValue() 
+        {
+            return label;
+        }
+
+        @Override
+        public boolean stopCellEditing() 
+        {
+            isPushed = false;
+            return super.stopCellEditing();
+        }
+
+        @Override
+        protected void fireEditingStopped() 
+        {
+            super.fireEditingStopped();
+        }
+
+        // Method to edit an existing order
+        private void editOrder(int row) 
+        {
+            String name = (String) tableModel.getValueAt(row, 1);
+            String phone = (String) tableModel.getValueAt(row, 2);
+            String address = (String) tableModel.getValueAt(row, 3);
+            String orderType = (String) tableModel.getValueAt(row, 4);
+            String priority = (String) tableModel.getValueAt(row, 5);
+
+            nameInput.setText(name);
+            phoneInput.setText(phone);
+            addressInput.setText(address);
+            orderTypeComboBox.setSelectedItem(orderType);
+            if (priority.equals("Urgent"))
+            {
+                urgentRadioButton.setSelected(true);
+            } else {
+                normalRadioButton.setSelected(true);
+            }
+
+            editingRow = row; // Set editing row
+        }
+    }
+}
